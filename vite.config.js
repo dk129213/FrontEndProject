@@ -10,6 +10,18 @@ export default defineConfig({
             refresh: true,
         }),
     ],
+    // Fixed file names (no content hash). GitHub Pages lets browsers keep a
+    // page for 10 minutes; with hashed names a saved page could ask for a
+    // stylesheet that a newer deploy already deleted and show up unstyled.
+    build: {
+        rollupOptions: {
+            output: {
+                entryFileNames: 'assets/[name].js',
+                chunkFileNames: 'assets/[name].js',
+                assetFileNames: 'assets/[name][extname]',
+            },
+        },
+    },
     server: {
         watch: {
             ignored: ['**/storage/framework/views/**'],
