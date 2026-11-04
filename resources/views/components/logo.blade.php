@@ -1,0 +1,3 @@
+@props(['size' => 36])
+{{-- The Riva mark: an R on an asphalt tile with two orange lane dashes. Never recolour the dashes. --}}
+<svg width="{{ $size }}" height="{{ $size }}" viewBox="0 0 48 48" aria-hidden="true" {{ $attributes }}><rect width="48" height="48" rx="10" fill="#1c1f23"/><path d="M13 14h10a8 8 0 0 1 2.4 15.6L31 36" fill="none" stroke="#f5f3ef" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 14v22" stroke="#f5f3ef" stroke-width="4.5" stroke-linecap="round"/><rect x="31" y="11" width="9" height="4" rx="2" fill="#c4470f"/><rect x="34" y="19" width="6" height="4" rx="2" fill="#c4470f"/></svg>

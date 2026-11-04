@@ -1,0 +1,81 @@
+name: Deploy to GitHub Pages
+
+# Builds the Laravel site, exports every page to static HTML and publishes
+# it to https://<owner>.github.io/<repo>/ on every push to main.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the Pages address
+        id: site
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo="${GITHUB_REPOSITORY#*/}"
+          if [ "${repo,,}" = "${owner}.github.io" ]; then base=""; else base="/${repo}"; fi
+          echo "base=${base}" >> "$GITHUB_OUTPUT"
+          echo "url=https://${owner}.github.io${base}" >> "$GITHUB_OUTPUT"
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, gd, zip
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          composer install --no-interaction --prefer-dist --no-progress
+          npm ci
+
+      - name: Build CSS and JavaScript
+        run: npm run build
+        env:
+          ASSET_URL: ${{ steps.site.outputs.base }}
+
+      - name: Export static pages
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+          php tools/smoke.php
+          php artisan export
+          cp dist/not-found/index.html dist/404.html
+          touch dist/.nojekyll
+        env:
+          APP_BASE_PATH: ${{ steps.site.outputs.base }}
+          ASSET_URL: ${{ steps.site.outputs.base }}
+          PUBLIC_URL: ${{ steps.site.outputs.url }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

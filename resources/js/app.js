@@ -1,0 +1,23 @@
+import { initAccount } from './account';
+import { initAuth } from './auth';
+import { initBackoffice } from './backoffice';
+import { initCheckout } from './checkout';
+import { initCinematic } from './cinematic';
+import { initCompare } from './compare';
+import { initFavourites } from './favourites';
+import { initFinance } from './finance';
+import { initForms } from './forms';
+import { initInventory } from './inventory';
+import { initUi } from './ui';
+
+initAuth();
+initUi();
+initCinematic();
+initForms();
+initFavourites();
+initCompare();
+initFinance();
+initInventory();
+initCheckout();
+initAccount();
+initBackoffice();
