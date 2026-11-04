@@ -3837,6 +3837,11 @@ fieldset > legend {
     min-height: 100dvh;
 }
 
+/* The content column must not grow to fit wide tables; they scroll inside their box */
+.bo > div {
+    min-width: 0;
+}
+
 .side-nav {
     position: sticky;
     top: 0;
@@ -3939,6 +3944,8 @@ fieldset > legend {
 }
 
 .table-wrap {
+    /* Contains hidden screen-reader labels, so they cannot widen the page */
+    position: relative;
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: var(--radius-lg);
@@ -4125,13 +4132,13 @@ fieldset > legend {
     }
 
     .bo-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 }
 
 @media (max-width: 900px) {
     .bo {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .side-nav {
