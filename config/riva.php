@@ -10,9 +10,10 @@ return [
 
     /*
     | Public address of the site, used for the QR code that opens the
-    | login page on a phone. Falls back to APP_URL when not set.
+    | login page on a phone. Defaults to the live GitHub Pages site, so the
+    | QR code works for visitors even when shown from a local copy.
     */
-    'public_url' => env('PUBLIC_URL') ?: env('APP_URL', 'http://localhost:8000'),
+    'public_url' => env('PUBLIC_URL') ?: 'https://dk129213.github.io/FrontEndProject',
 
     'dealer' => [
         'name' => 'Riva Motors',
