@@ -927,20 +927,67 @@ fieldset > legend {
         margin-right: calc(-1 * var(--space-2));
     }
 
+    /* Drops down from under the header and fills the rest of the screen */
     .mobile-nav {
         position: fixed;
-        inset: var(--header-h) 0 0 0;
+        top: var(--header-h);
+        left: 0;
+        right: 0;
+        height: calc(100dvh - var(--header-h));
         z-index: 39;
         background: var(--surface);
-        padding: var(--space-5) var(--space-4) var(--space-6);
+        padding: var(--space-5) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
         overflow-y: auto;
+        overscroll-behavior: contain;
         flex-direction: column;
         gap: var(--space-1);
+        border-top: 1px solid var(--line);
     }
 
     .mobile-nav.is-open {
         display: flex;
-        animation: fade-in 0.2s ease;
+        animation: menu-drop 0.32s var(--ease-out);
+    }
+
+    .mobile-nav.is-open .mobile-nav__link {
+        animation: menu-item 0.4s var(--ease-out) both;
+    }
+
+    .mobile-nav.is-open .mobile-nav__link:nth-child(2) {
+        animation-delay: 0.03s;
+    }
+
+    .mobile-nav.is-open .mobile-nav__link:nth-child(3) {
+        animation-delay: 0.06s;
+    }
+
+    .mobile-nav.is-open .mobile-nav__link:nth-child(4) {
+        animation-delay: 0.09s;
+    }
+
+    .mobile-nav.is-open .mobile-nav__link:nth-child(5) {
+        animation-delay: 0.12s;
+    }
+
+    /* While the menu is open the header is solid, so the page does not show through */
+    .menu-open .site-header {
+        background: var(--surface);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+
+    @keyframes menu-drop {
+        from {
+            opacity: 0;
+            transform: translateY(-12px);
+        }
+    }
+
+    @keyframes menu-item {
+        from {
+            opacity: 0;
+            transform: translateY(-6px);
+        }
     }
 
     .mobile-nav a.mobile-nav__link {

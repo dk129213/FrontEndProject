@@ -55,19 +55,20 @@
                 </button>
             </div>
         </div>
-
-        <nav class="mobile-nav" id="mobile-nav" aria-label="Main">
-            <a class="mobile-nav__link" href="{{ page('cars.index') }}">Buy a car <x-icon name="chevron-right" /></a>
-            <a class="mobile-nav__link" href="{{ page('compare') }}">Compare cars <x-icon name="chevron-right" /></a>
-            <a class="mobile-nav__link" href="{{ page('sell') }}">Sell your car <x-icon name="chevron-right" /></a>
-            <a class="mobile-nav__link" href="{{ page('home') }}#visit">Visit us <x-icon name="chevron-right" /></a>
-            <a class="mobile-nav__link" href="{{ page('login') }}" data-account-link><span data-account-label>Log in</span> <x-icon name="chevron-right" /></a>
-            <div class="mobile-nav__footer">
-                <a class="btn btn--secondary btn--lg btn--block" href="tel:{{ str_replace(' ', '', $dealer['phone']) }}"><x-icon name="phone" /> Call {{ $dealer['phone'] }}</a>
-                <p class="caption">{{ $dealer['hours'][0][0] }} {{ $dealer['hours'][0][1] }}, {{ $dealer['hours'][1][0] }} {{ $dealer['hours'][1][1] }}</p>
-            </div>
-        </nav>
     </header>
+
+    {{-- Outside the header: the header's blur would otherwise trap this fixed panel inside it --}}
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Main">
+        <a class="mobile-nav__link" href="{{ page('cars.index') }}">Buy a car <x-icon name="chevron-right" /></a>
+        <a class="mobile-nav__link" href="{{ page('compare') }}">Compare cars <x-icon name="chevron-right" /></a>
+        <a class="mobile-nav__link" href="{{ page('sell') }}">Sell your car <x-icon name="chevron-right" /></a>
+        <a class="mobile-nav__link" href="{{ page('home') }}#visit">Visit us <x-icon name="chevron-right" /></a>
+        <a class="mobile-nav__link" href="{{ page('login') }}" data-account-link><span data-account-label>Log in</span> <x-icon name="chevron-right" /></a>
+        <div class="mobile-nav__footer">
+            <a class="btn btn--secondary btn--lg btn--block" href="tel:{{ str_replace(' ', '', $dealer['phone']) }}"><x-icon name="phone" /> Call {{ $dealer['phone'] }}</a>
+            <p class="caption">{{ $dealer['hours'][0][0] }} {{ $dealer['hours'][0][1] }}, {{ $dealer['hours'][1][0] }} {{ $dealer['hours'][1][1] }}</p>
+        </div>
+    </nav>
 
     <main id="main">
         {{ $slot }}

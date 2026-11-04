@@ -37,17 +37,23 @@ function initMenu() {
     const panel = $('#mobile-nav');
     if (!toggle || !panel) return;
     panel.dataset.scrim = 'none';
-    drawer(toggle, panel, {
+    const set = drawer(toggle, panel, {
         onOpen: () => {
+            document.documentElement.classList.add('menu-open');
             $('[data-icon-open]', toggle).setAttribute('hidden', '');
             $('[data-icon-close]', toggle).removeAttribute('hidden');
         },
         onClose: () => {
+            document.documentElement.classList.remove('menu-open');
             $('[data-icon-open]', toggle).removeAttribute('hidden');
             $('[data-icon-close]', toggle).setAttribute('hidden', '');
         },
     });
-    $$('a', panel).forEach((a) => a.addEventListener('click', () => toggle.click()));
+    $$('a', panel).forEach((a) => a.addEventListener('click', () => set(false)));
+    // Turning a phone sideways or widening the window past the menu breakpoint closes it
+    window.matchMedia('(min-width: 901px)').addEventListener('change', (event) => {
+        if (event.matches && panel.classList.contains('is-open')) set(false);
+    });
 }
 
 function initSideNav() {
