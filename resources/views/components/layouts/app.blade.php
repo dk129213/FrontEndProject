@@ -106,6 +106,7 @@
                             <li><a href="{{ page('account') }}">Favourites and orders</a></li>
                             <li><a href="{{ page('scan') }}">Open on your phone</a></li>
                             <li><a href="{{ page('sales.dashboard') }}">Staff area</a></li>
+                            <li><a href="{{ page('api-docs') }}">API documentation</a></li>
                         </ul>
                     </div>
                     <div>

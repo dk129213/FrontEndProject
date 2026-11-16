@@ -25,6 +25,7 @@ Route::controller(StorefrontController::class)->group(function () {
     Route::get('/account', 'account')->name('account');
     Route::get('/photo-credits', 'credits')->name('credits');
     Route::get('/not-found', 'notFound')->name('not-found');
+    Route::view('/api-docs', 'api.docs')->name('api-docs');
 });
 
 Route::controller(BackofficeController::class)->group(function () {

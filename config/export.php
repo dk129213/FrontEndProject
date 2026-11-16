@@ -11,6 +11,10 @@ $carPages = array_merge(...array_map(fn ($slug) => [
     "cars/{$slug}",
     "cars/{$slug}/extras",
     "cars/{$slug}/pay",
+    // API: saved as real .json files, so GitHub Pages serves them as JSON
+    "api/v1/cars/{$slug}.json",
+    "api/v1/cars/{$slug}/additions.json",
+    "api/v1/cars/{$slug}/finance.json",
 ], $slugs));
 
 return [
@@ -31,6 +35,11 @@ return [
         'account',
         'photo-credits',
         'not-found',
+        'api-docs',
+        'api/v1/index.json',
+        'api/v1/cars.json',
+        'api/v1/additions.json',
+        'api/v1/filters.json',
         'sales',
         'sales/cars',
         'sales/cars/new',

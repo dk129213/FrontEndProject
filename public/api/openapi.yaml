@@ -1,0 +1,756 @@
+openapi: 3.1.0
+info:
+  title: Riva Motors API
+  version: 1.0.0
+  summary: Cars for sale, extras, finance quotes and online reservations for the Riva Motors dealership.
+  description: |
+    The Riva Motors API serves the same data as the Riva Motors website: the cars on sale with every
+    specification, the extras that can be fitted to each car, monthly finance quotes, and online
+    reservations (sales) with a card payment.
+
+    ## Two ways to call it
+
+    | Server | What works |
+    | --- | --- |
+    | **Live site** `https://dk129213.github.io/FrontEndProject` | Every `GET` endpoint, as published files. Query parameters are ignored there: you get the default response (for example all cars for sale, newest first). |
+    | **PHP server** `http://localhost:8000` (`php artisan serve` in the project) | Everything: filters and sorting with query parameters, custom finance terms, and `POST /api/v1/sales`. |
+
+    The live site is hosted on GitHub Pages, which only serves files and cannot run PHP. That is why
+    read endpoints end in `.json`: the same URL works on both servers.
+
+    ## Conventions
+
+    - **Format:** JSON, UTF-8. Successful responses wrap the payload in `data`, lists add `meta`.
+    - **Money:** whole euros as integers (`23400` is EUR 23,400). Every price includes 25% VAT.
+    - **Identifiers:** cars are addressed by their `slug` (for example `volkswagen-golf-2022`); extras by a numeric `id`.
+    - **Dates:** ISO 8601 with time zone (`2026-10-17T09:40:00+00:00`).
+    - **Links:** image and page links are absolute URLs on the live site.
+    - **Errors:** always the same shape, see the `Error` schema. Use the `code` field in programs and the `message` for people.
+    - **CORS:** responses allow any origin (`Access-Control-Allow-Origin: *`), so the API can be called from any website.
+    - **Authentication:** none. The API only exposes public stock data, and sales are simulated.
+
+    ## Payments are simulated
+
+    `POST /api/v1/sales` follows Stripe's test mode: card `4242 4242 4242 4242` succeeds and
+    `4000 0000 0000 0002` is declined. No money moves and no card data is stored or sent anywhere.
+    The project has no database, so a created sale is returned in full but not saved (`stored: false`).
+  contact:
+    name: Riva Motors, ADP final project, Group 1
+    url: https://github.com/dk129213/FrontEndProject
+servers:
+  - url: https://dk129213.github.io/FrontEndProject
+    description: Live site (GET endpoints only, default responses)
+  - url: http://localhost:8000
+    description: Local PHP server (all endpoints and parameters)
+tags:
+  - name: Cars
+    description: The cars on the lot and everything about each one.
+  - name: Catalogue
+    description: Extras and the values cars can be filtered by.
+  - name: Sales
+    description: Reserving a car online.
+  - name: API
+    description: Information about the API itself.
+
+paths:
+  /api/v1/index.json:
+    get:
+      tags: [API]
+      operationId: getApiIndex
+      summary: API information
+      description: Name, version, links to this documentation and the list of endpoints.
+      responses:
+        '200':
+          description: API information.
+          content:
+            application/json:
+              example:
+                name: Riva Motors API
+                version: 1.0.0
+                documentation: https://dk129213.github.io/FrontEndProject/api-docs
+                openapi: https://dk129213.github.io/FrontEndProject/api/openapi.yaml
+                endpoints:
+                  - GET /api/v1/cars.json
+                  - GET /api/v1/cars/{slug}.json
+                  - GET /api/v1/cars/{slug}/additions.json
+                  - GET /api/v1/cars/{slug}/finance.json
+                  - GET /api/v1/additions.json
+                  - GET /api/v1/filters.json
+                  - POST /api/v1/sales
+
+  /api/v1/cars.json:
+    get:
+      tags: [Cars]
+      operationId: listCars
+      summary: List cars
+      description: |
+        Cars for sale, newest first by default. Every filter is optional and filters combine (AND).
+        **Filters and sorting need the PHP server**; the live site always returns the default list.
+      parameters:
+        - name: brand
+          in: query
+          description: Make, matched without regard to case (`Škoda`, `Volkswagen`, `BMW`...). See `GET /api/v1/filters.json` for the makes in stock.
+          schema: { type: string }
+          example: Toyota
+        - name: body
+          in: query
+          description: Body type.
+          schema: { $ref: '#/components/schemas/CarCategory' }
+        - name: fuel
+          in: query
+          description: One fuel, or several separated by commas.
+          schema: { type: string }
+          example: hybrid,electric
+        - name: gearbox
+          in: query
+          schema: { $ref: '#/components/schemas/Transmission' }
+        - name: condition
+          in: query
+          schema: { type: string, enum: [new, used] }
+        - name: min_price
+          in: query
+          description: Lowest price in euros, VAT included.
+          schema: { type: integer, minimum: 0 }
+        - name: max_price
+          in: query
+          description: Highest price in euros, VAT included.
+          schema: { type: integer, minimum: 0 }
+          example: 30000
+        - name: max_mileage
+          in: query
+          description: Highest mileage in kilometres.
+          schema: { type: integer, minimum: 0 }
+        - name: year_from
+          in: query
+          description: First registered in this year or later.
+          schema: { type: integer, minimum: 1990 }
+        - name: status
+          in: query
+          description: |
+            Which cars to include. `for_sale` (default) means available and reserved; `all` includes sold cars.
+          schema:
+            type: string
+            enum: [for_sale, available, reserved, sold, all]
+            default: for_sale
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [newest, price_asc, price_desc, mileage_asc, year_desc]
+            default: newest
+      responses:
+        '200':
+          description: The matching cars.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/CarSummary' }
+                  meta:
+                    type: object
+                    properties:
+                      total: { type: integer, description: Number of cars returned. }
+                      sort: { type: string }
+                      filters: { type: object, description: The filters that were applied. }
+                      status: { type: string }
+              example:
+                data:
+                  - id: 138
+                    slug: toyota-yaris-hybrid-2023
+                    brand: Toyota
+                    model: Yaris
+                    variant: Hybrid 1.5
+                    title: 2023 Toyota Yaris
+                    production_year: 2023
+                    condition: used
+                    mileage_km: 18200
+                    engine_type: hybrid
+                    transmission: automatic
+                    horsepower: 116
+                    car_category: hatchback
+                    colour: Platinum White
+                    price: { amount: 19800, currency: EUR, vat_included: true, vat_rate: 25 }
+                    monthly_from: 313
+                    status: available
+                    listed_at: '2026-10-15T11:10:00+00:00'
+                    images:
+                      main: https://dk129213.github.io/FrontEndProject/images/cars/toyota-yaris-hybrid-2023/1.jpg
+                      cutout: https://dk129213.github.io/FrontEndProject/images/cars/toyota-yaris-hybrid-2023/cutout.webp
+                    links:
+                      self: https://dk129213.github.io/FrontEndProject/api/v1/cars/toyota-yaris-hybrid-2023.json
+                      web: https://dk129213.github.io/FrontEndProject/cars/toyota-yaris-hybrid-2023
+                meta:
+                  total: 4
+                  sort: price_asc
+                  filters: { fuel: 'hybrid,electric' }
+                  status: for_sale
+        '422':
+          $ref: '#/components/responses/InvalidQuery'
+
+  /api/v1/cars/{slug}.json:
+    get:
+      tags: [Cars]
+      operationId: getCar
+      summary: Get one car
+      description: Every detail of one car, including the gallery, equipment, the extras it can take and a finance example.
+      parameters:
+        - $ref: '#/components/parameters/Slug'
+      responses:
+        '200':
+          description: The car.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/CarDetail' }
+              example:
+                data:
+                  id: 141
+                  slug: volkswagen-golf-2022
+                  brand: Volkswagen
+                  model: Golf
+                  variant: Style 1.5 TSI
+                  title: 2022 Volkswagen Golf
+                  production_year: 2022
+                  condition: used
+                  mileage_km: 31500
+                  engine_type: petrol
+                  transmission: manual
+                  horsepower: 130
+                  car_category: hatchback
+                  colour: Reflex Silver
+                  price: { amount: 23400, currency: EUR, vat_included: true, vat_rate: 25 }
+                  monthly_from: 370
+                  status: available
+                  listed_at: '2026-10-17T09:40:00+00:00'
+                  images:
+                    main: https://dk129213.github.io/FrontEndProject/images/cars/volkswagen-golf-2022/1.jpg
+                    cutout: https://dk129213.github.io/FrontEndProject/images/cars/volkswagen-golf-2022/cutout.webp
+                    gallery:
+                      - https://dk129213.github.io/FrontEndProject/images/cars/volkswagen-golf-2022/1.jpg
+                      - https://dk129213.github.io/FrontEndProject/images/cars/volkswagen-golf-2022/2.jpg
+                      - https://dk129213.github.io/FrontEndProject/images/cars/volkswagen-golf-2022/3.jpg
+                  links:
+                    self: https://dk129213.github.io/FrontEndProject/api/v1/cars/volkswagen-golf-2022.json
+                    web: https://dk129213.github.io/FrontEndProject/cars/volkswagen-golf-2022
+                  vin: WVWZZZCDZNW118305
+                  engine: 1.5 TSI
+                  number_of_gears: 6
+                  drivetrain: Front-wheel drive
+                  previous_owners: 1
+                  consumption: 5.3 l/100 km
+                  description: The Style trim adds ambient lighting, LED Plus headlights and a larger digital cockpit. Full Volkswagen service history.
+                  equipment: [Digital cockpit, LED Plus headlights, Lane assist]
+                  salesperson: { id: 3, name: Ivana Perić }
+                  additions:
+                    - id: 1
+                      name: Winter tyres on alloy wheels
+                      description: A full set fitted and stored for you between seasons.
+                      price: { amount: 890, currency: EUR, vat_included: true, vat_rate: 25 }
+                  finance_example:
+                    car_price: 23400
+                    currency: EUR
+                    apr_percent: 6.9
+                    deposit_percent: 20
+                    deposit: 4680
+                    loan_amount: 18720
+                    months: 60
+                    monthly_payment: 370
+                    total_payable: 26880
+                    total_interest: 3480
+                    representative_example: true
+        '404':
+          $ref: '#/components/responses/CarNotFound'
+
+  /api/v1/cars/{slug}/additions.json:
+    get:
+      tags: [Cars]
+      operationId: listCarAdditions
+      summary: Extras for one car
+      description: The extras that can be added to this car at checkout. Electric cars get a home wallbox instead of registration and a first tank of fuel.
+      parameters:
+        - $ref: '#/components/parameters/Slug'
+      responses:
+        '200':
+          description: The extras for the car.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Addition' }
+                  meta:
+                    type: object
+                    properties:
+                      car: { type: string }
+                      total: { type: integer }
+        '404':
+          $ref: '#/components/responses/CarNotFound'
+
+  /api/v1/cars/{slug}/finance.json:
+    get:
+      tags: [Cars]
+      operationId: getFinanceQuote
+      summary: Finance quote for one car
+      description: |
+        Monthly payment for a loan on this car, at a fixed representative rate of 6.9% APR.
+        Without parameters (and always on the live site) it uses a 20% deposit over 60 months.
+        This is an illustration, not a finance offer.
+
+        Formula: `monthly = loan x r / (1 - (1 + r)^-months)` with `r = APR / 12`, rounded to whole euros.
+      parameters:
+        - $ref: '#/components/parameters/Slug'
+        - name: deposit_percent
+          in: query
+          description: Deposit as a percentage of the price.
+          schema: { type: integer, minimum: 0, maximum: 50, default: 20 }
+          example: 30
+        - name: months
+          in: query
+          description: Length of the loan.
+          schema: { type: integer, enum: [24, 36, 48, 60, 72], default: 60 }
+          example: 36
+      responses:
+        '200':
+          description: The quote.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/FinanceQuote' }
+              example:
+                data:
+                  car_price: 23400
+                  currency: EUR
+                  apr_percent: 6.9
+                  deposit_percent: 30
+                  deposit: 7020
+                  loan_amount: 16380
+                  months: 36
+                  monthly_payment: 505
+                  total_payable: 25200
+                  total_interest: 1800
+                  representative_example: true
+        '404':
+          $ref: '#/components/responses/CarNotFound'
+        '422':
+          $ref: '#/components/responses/InvalidQuery'
+
+  /api/v1/additions.json:
+    get:
+      tags: [Catalogue]
+      operationId: listAdditions
+      summary: List all extras
+      description: Every extra currently offered at checkout. Which ones fit a given car is in `GET /api/v1/cars/{slug}/additions.json`.
+      responses:
+        '200':
+          description: The extras.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Addition' }
+                  meta:
+                    type: object
+                    properties:
+                      total: { type: integer }
+
+  /api/v1/filters.json:
+    get:
+      tags: [Catalogue]
+      operationId: getFilters
+      summary: Filter options
+      description: The values `GET /api/v1/cars.json` can be filtered by, with how many cars for sale match each. Useful for building a search form.
+      responses:
+        '200':
+          description: Filter values and counts.
+          content:
+            application/json:
+              example:
+                data:
+                  makes:
+                    - { value: BMW, label: BMW, count: 1 }
+                    - { value: Škoda, label: Škoda, count: 3 }
+                  body:
+                    - { value: suv, label: SUV, count: 4 }
+                    - { value: hatchback, label: Hatchback, count: 4 }
+                  fuel:
+                    - { value: petrol, label: Petrol, count: 4 }
+                    - { value: diesel, label: Diesel, count: 4 }
+                    - { value: hybrid, label: Hybrid, count: 2 }
+                    - { value: electric, label: Electric, count: 2 }
+                  gearbox:
+                    - { value: automatic, label: Automatic, count: 9 }
+                    - { value: manual, label: Manual, count: 3 }
+                  condition:
+                    - { value: used, label: Used, count: 10 }
+                    - { value: new, label: New, count: 2 }
+                  price: { min: 15900, max: 52900, currency: EUR }
+                  production_year: { min: 2019, max: 2026 }
+                  sort: [newest, price_asc, price_desc, mileage_asc, year_desc]
+                meta:
+                  cars_for_sale: 12
+
+  /api/v1/sales:
+    post:
+      tags: [Sales]
+      operationId: createSale
+      summary: Reserve a car (create a sale)
+      description: |
+        Reserves a car for a buyer, with optional extras, and takes a simulated card payment.
+        Mirrors the checkout on the website.
+
+        **Needs the PHP server.** The live site cannot accept `POST` requests.
+
+        Checks, in order:
+        1. All fields present and valid, card number passes the Luhn check, card not expired (`422 validation_failed`).
+        2. The car exists (`404 car_not_found`).
+        3. The car is `available`, not reserved or sold (`409 car_unavailable`).
+        4. Every extra is offered for this car (`422 addition_not_offered`).
+        5. The card is not the decline test card (`402 payment_declined`).
+
+        On success the sale is `requested` (the salesperson calls the buyer to arrange collection) and the
+        payment is `paid`. The project has no database, so the sale is not stored (`stored: false`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SaleRequest' }
+            example:
+              car: volkswagen-golf-2022
+              additions: [1, 5]
+              buyer:
+                first_name: Ana
+                last_name: Horvat
+                email: ana@example.com
+                phone: +385 98 000 2201
+              payment:
+                card_number: 4242 4242 4242 4242
+                exp_month: 12
+                exp_year: 2028
+                cvc: '123'
+      responses:
+        '201':
+          description: The car is reserved and the payment went through.
+          headers:
+            Location:
+              description: Address of the new sale.
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Sale' }
+              example:
+                data:
+                  id: RM-2026-91478
+                  status: requested
+                  payment_status: paid
+                  payment_reference: pi_k3j9xq2mz8w1ab
+                  requested_at: '2026-11-16T10:24:51+00:00'
+                  car: { slug: volkswagen-golf-2022, title: 2022 Volkswagen Golf, price: { amount: 23400, currency: EUR, vat_included: true, vat_rate: 25 } }
+                  buyer: { first_name: Ana, last_name: Horvat, email: ana@example.com, phone: +385 98 000 2201 }
+                  salesperson: { id: 3, name: Ivana Perić }
+                  base_car_price: 23400
+                  additions:
+                    - { addition_id: 1, name: Winter tyres on alloy wheels, price_at_purchase: 890 }
+                    - { addition_id: 5, name: All-weather floor mats, price_at_purchase: 95 }
+                  total_price: 24385
+                  vat_included: 4877
+                  currency: EUR
+                  card: { brand: visa, last4: '4242' }
+                  stored: false
+        '402':
+          description: The card was declined. Nothing was charged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: payment_declined, message: The card was declined and nothing was charged. }
+        '404':
+          $ref: '#/components/responses/CarNotFound'
+        '409':
+          description: The car is already reserved or sold.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: car_unavailable, message: The 2022 Tesla Model 3 is already reserved by another customer. }
+        '422':
+          description: Missing or invalid fields, or an extra that is not offered for the car.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                validation:
+                  summary: Fields missing or not valid
+                  value:
+                    error:
+                      code: validation_failed
+                      message: Some fields are missing or not valid.
+                      details:
+                        buyer.email: [The email field must be a valid email address.]
+                        payment.card_number: [The card number is not valid.]
+                        payment.exp_year: [The card has expired.]
+                notOffered:
+                  summary: Extra not offered for this car
+                  value:
+                    error:
+                      code: addition_not_offered
+                      message: Some extras are not offered for this car.
+                      details:
+                        additions: [7]
+                        offered: [1, 2, 3, 4, 5, 6]
+    get:
+      tags: [Sales]
+      operationId: salesMethodNotAllowed
+      summary: Not available (use POST)
+      description: Listing sales is not part of the public API. `GET`, `PUT`, `PATCH` and `DELETE` return 405.
+      responses:
+        '405':
+          description: Method not allowed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: { code: method_not_allowed, message: Use POST to create a sale. }
+
+components:
+  parameters:
+    Slug:
+      name: slug
+      in: path
+      required: true
+      description: The car's slug, lowercase letters, digits and hyphens. Listed in `GET /api/v1/cars.json`.
+      schema: { type: string, pattern: '^[a-z0-9-]+$' }
+      example: volkswagen-golf-2022
+
+  responses:
+    CarNotFound:
+      description: No car has this slug.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: { code: car_not_found, message: No car with the slug "ferrari". }
+    InvalidQuery:
+      description: A query parameter has a value that is not allowed. `details` lists each problem by parameter.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error:
+              code: invalid_query
+              message: Some filters are not valid.
+              details:
+                sort: [The selected sort is invalid.]
+                fuel: ['Use one or more of: petrol, diesel, hybrid, electric.']
+
+  schemas:
+    EngineType:
+      type: string
+      enum: [petrol, diesel, hybrid, electric]
+    Transmission:
+      type: string
+      enum: [automatic, manual]
+    CarCategory:
+      type: string
+      enum: [suv, estate, hatchback, saloon]
+    CarStatus:
+      type: string
+      enum: [available, reserved, sold]
+      description: '`available` can be reserved; `reserved` is held for another buyer; `sold` is gone.'
+
+    Price:
+      type: object
+      required: [amount, currency, vat_included, vat_rate]
+      properties:
+        amount: { type: integer, description: Whole euros. }
+        currency: { type: string, const: EUR }
+        vat_included: { type: boolean, const: true }
+        vat_rate: { type: integer, description: VAT percentage included in the amount., example: 25 }
+
+    CarSummary:
+      type: object
+      required: [id, slug, brand, model, title, production_year, condition, mileage_km, engine_type, transmission, horsepower, car_category, price, status, images, links]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        brand: { type: string, example: Škoda }
+        model: { type: string, example: Octavia Combi }
+        variant: { type: string, example: Style 2.0 TDI }
+        title: { type: string, description: Year, make and model., example: 2021 Škoda Octavia Combi }
+        production_year: { type: integer }
+        condition: { type: string, enum: [new, used] }
+        mileage_km: { type: integer }
+        engine_type: { $ref: '#/components/schemas/EngineType' }
+        transmission: { $ref: '#/components/schemas/Transmission' }
+        horsepower: { type: integer }
+        car_category: { $ref: '#/components/schemas/CarCategory' }
+        colour: { type: string }
+        price: { $ref: '#/components/schemas/Price' }
+        monthly_from: { type: integer, description: Monthly payment in euros for the representative finance example (20% deposit, 60 months, 6.9% APR). }
+        status: { $ref: '#/components/schemas/CarStatus' }
+        listed_at: { type: string, format: date-time }
+        images:
+          type: object
+          properties:
+            main: { type: string, format: uri, description: Main photo, 16:10. }
+            cutout: { type: [string, 'null'], format: uri, description: The car with its background removed (transparent WebP). }
+        links:
+          type: object
+          properties:
+            self: { type: string, format: uri, description: This car in the API. }
+            web: { type: string, format: uri, description: This car on the website. }
+
+    CarDetail:
+      allOf:
+        - $ref: '#/components/schemas/CarSummary'
+        - type: object
+          properties:
+            images:
+              type: object
+              properties:
+                gallery:
+                  type: array
+                  items: { type: string, format: uri }
+            vin: { type: string, minLength: 17, maxLength: 17 }
+            engine: { type: string, example: 2.0 TDI }
+            number_of_gears: { type: integer, description: '1 for electric and hybrid single-speed gearboxes.' }
+            drivetrain: { type: string, example: Front-wheel drive }
+            previous_owners: { type: integer }
+            consumption: { type: string, description: Fuel consumption, or range for electric cars., example: 4.7 l/100 km }
+            description: { type: string }
+            equipment:
+              type: array
+              items: { type: string }
+            salesperson:
+              type: [object, 'null']
+              properties:
+                id: { type: integer }
+                name: { type: string }
+            additions:
+              type: array
+              items: { $ref: '#/components/schemas/Addition' }
+            finance_example: { $ref: '#/components/schemas/FinanceQuote' }
+
+    Addition:
+      type: object
+      required: [id, name, price]
+      properties:
+        id: { type: integer }
+        name: { type: string, example: Winter tyres on alloy wheels }
+        description: { type: string }
+        price: { $ref: '#/components/schemas/Price' }
+
+    FinanceQuote:
+      type: object
+      properties:
+        car_price: { type: integer }
+        currency: { type: string, const: EUR }
+        apr_percent: { type: number, example: 6.9 }
+        deposit_percent: { type: integer }
+        deposit: { type: integer }
+        loan_amount: { type: integer }
+        months: { type: integer }
+        monthly_payment: { type: integer }
+        total_payable: { type: integer, description: Deposit plus all monthly payments. }
+        total_interest: { type: integer }
+        representative_example: { type: boolean, const: true, description: Always true. An illustration, not a finance offer. }
+
+    SaleRequest:
+      type: object
+      required: [car, buyer, payment]
+      properties:
+        car: { type: string, description: Slug of an `available` car. }
+        additions:
+          type: array
+          description: IDs of extras offered for this car. May be empty or left out.
+          items: { type: integer }
+        buyer:
+          type: object
+          required: [first_name, last_name, email, phone]
+          properties:
+            first_name: { type: string, maxLength: 60 }
+            last_name: { type: string, maxLength: 60 }
+            email: { type: string, format: email }
+            phone: { type: string, minLength: 8, maxLength: 30 }
+        payment:
+          type: object
+          required: [card_number, exp_month, exp_year, cvc]
+          description: Test cards only. 4242 4242 4242 4242 succeeds, 4000 0000 0000 0002 is declined.
+          properties:
+            card_number: { type: string, description: 16 digits, spaces allowed, must pass the Luhn check. }
+            exp_month: { type: integer, minimum: 1, maximum: 12 }
+            exp_year: { type: integer, description: Four digits, not in the past. }
+            cvc: { type: string, pattern: '^[0-9]{3,4}$' }
+
+    Sale:
+      type: object
+      properties:
+        id: { type: string, description: Order number., example: RM-2026-91478 }
+        status: { type: string, enum: [requested, completed, cancelled], description: New sales are always `requested`. }
+        payment_status: { type: string, enum: [pending, paid, failed] }
+        payment_reference: { type: string }
+        requested_at: { type: string, format: date-time }
+        car: { $ref: '#/components/schemas/CarSummary' }
+        buyer:
+          type: object
+          properties:
+            first_name: { type: string }
+            last_name: { type: string }
+            email: { type: string }
+            phone: { type: string }
+        salesperson:
+          type: [object, 'null']
+          properties:
+            id: { type: integer }
+            name: { type: string }
+        base_car_price: { type: integer }
+        additions:
+          type: array
+          items:
+            type: object
+            properties:
+              addition_id: { type: integer }
+              name: { type: string }
+              price_at_purchase: { type: integer }
+        total_price: { type: integer, description: Car plus extras, VAT included. }
+        vat_included: { type: number, description: The VAT part of the total. }
+        currency: { type: string, const: EUR }
+        card:
+          type: object
+          properties:
+            brand: { type: string }
+            last4: { type: string }
+        stored: { type: boolean, const: false, description: Always false. The project has no database. }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable code.
+              enum: [invalid_query, car_not_found, validation_failed, car_unavailable, addition_not_offered, payment_declined, method_not_allowed, not_found]
+            message: { type: string, description: Plain-language explanation for people. }
+            details:
+              type: object
+              description: Extra information, for example the problem with each field.
+              additionalProperties: true

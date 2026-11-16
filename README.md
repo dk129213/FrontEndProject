@@ -43,6 +43,30 @@ ffmpeg -i film.mp4 -an -vf scale=960:-2,reverse -c:v libx264 -crf 26 -g 12 -movf
 
 Where each chapter stops is set with `data-at` (0 to 1 through the film) in `resources/views/storefront/partials/cinematic.blade.php`.
 
+## API
+
+A JSON API serves the same data as the website. Full documentation: **`/api-docs`** (live at https://dk129213.github.io/FrontEndProject/api-docs/), generated from the OpenAPI 3.1 file `public/api/openapi.yaml`.
+
+| Endpoint | What it returns |
+| --- | --- |
+| `GET /api/v1/index.json` | API name, version and endpoint list |
+| `GET /api/v1/cars.json` | Cars for sale, with filters (`brand`, `body`, `fuel`, `gearbox`, `condition`, `min_price`, `max_price`, `max_mileage`, `year_from`, `status`) and `sort` |
+| `GET /api/v1/cars/{slug}.json` | One car with every detail, gallery, extras and a finance example |
+| `GET /api/v1/cars/{slug}/additions.json` | Extras that fit that car |
+| `GET /api/v1/cars/{slug}/finance.json` | Finance quote (`deposit_percent`, `months`) |
+| `GET /api/v1/additions.json` | All extras on offer |
+| `GET /api/v1/filters.json` | Filter values with counts |
+| `POST /api/v1/sales` | Reserve a car with extras and a simulated card payment |
+
+On the live site (GitHub Pages) every `GET` endpoint works as a published file and query parameters are ignored. Filters, custom finance terms and `POST /api/v1/sales` need the PHP server (`php artisan serve`). Code: `routes/api.php`, `app/Http/Controllers/Api/`, `app/Support/ApiFormat.php`.
+
+Try it locally:
+
+```bash
+curl "http://localhost:8000/api/v1/cars.json?fuel=hybrid,electric&sort=price_asc"
+curl -X POST http://localhost:8000/api/v1/sales -H "Content-Type: application/json" -d '{"car":"volkswagen-golf-2022","additions":[1],"buyer":{"first_name":"Ana","last_name":"Horvat","email":"ana@example.com","phone":"+385 98 000 2201"},"payment":{"card_number":"4242 4242 4242 4242","exp_month":12,"exp_year":2028,"cvc":"123"}}'
+```
+
 ## Pages
 
 | Who | Pages |
